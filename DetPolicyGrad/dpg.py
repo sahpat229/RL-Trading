@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np 
 import random
 import tensorflow as tf 
+from tqdm import tqdm
 
 from networks import Network, ActorNetwork, CriticNetwork
 
@@ -39,7 +40,7 @@ class DDPG():
         for episode in range(1, self.num_episodes+1):
             state, reward = self.tsm.initialize()
             rewards = []
-            while not state.terminated:
+            for _ in tqdm(range(self.tsm.episode_length)):
                 if random.random() < epsilon:
                     action = self.random_action(num_dimensions=self.datacontainer.num_assets)
                 else:

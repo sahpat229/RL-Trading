@@ -69,7 +69,7 @@ class ActorNetwork(Network):
                 use_bias = True
 
             net = tf.layers.dense(inputs=inputs,
-                                  units=50,
+                                  units=200,
                                   activation=None,
                                   use_bias=use_bias,
                                   kernel_initializer=tf.contrib.layers.variance_scaling_initializer(),
@@ -81,7 +81,7 @@ class ActorNetwork(Network):
                                                     scale=True)
             net = tf.nn.relu(net)
             net = tf.layers.dense(inputs=net,
-                                  units=50,
+                                  units=100,
                                   activation=None,
                                   use_bias=use_bias,
                                   kernel_initializer=tf.contrib.layers.variance_scaling_initializer(),
@@ -171,7 +171,7 @@ class CriticNetwork(Network):
                 use_bias = True
 
             net = tf.layers.dense(inputs=inputs,
-                                  units=50,
+                                  units=200,
                                   activation=None,
                                   use_bias=use_bias,
                                   kernel_initializer=tf.contrib.layers.variance_scaling_initializer(),
@@ -183,13 +183,13 @@ class CriticNetwork(Network):
                                                     scale=True)
             net = tf.nn.relu(net)
             states = tf.layers.dense(inputs=net,
-                                     units=50,
+                                     units=100,
                                      activation=None,
                                      use_bias=False,
                                      kernel_initializer=tf.contrib.layers.variance_scaling_initializer(),
                                      trainable=True)
             actions = tf.layers.dense(inputs=self.actions,
-                                      units=50,
+                                      units=100,
                                       activation=None,
                                       use_bias=True,
                                       kernel_initializer=tf.contrib.layers.variance_scaling_initializer(),
@@ -227,7 +227,7 @@ class CriticNetwork(Network):
                                     self.predicted_q_value: predicted_q_value,
                                     self.is_training: True
                                 })
-        print("LOSS:", loss)
+        #print("LOSS:", loss)
         return loss
 
     def get_q_value(self, inputs, actions):
