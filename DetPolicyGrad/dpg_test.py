@@ -8,10 +8,10 @@ from networks import ActorNetwork, CriticNetwork
 from replaybuffer import ReplayBuffer
 from tradingstatemodel import TradingStateModel 
 
-NUM_EPISODES = 1
+NUM_EPISODES = 50
 EPISODE_LENGTH = 50
-COMMISSION_PERCENTAGE = 0.0
-BATCH_SIZE = 64
+COMMISSION_PERCENTAGE = 0.25
+BATCH_SIZE = 32
 BATCH_NORM = True
 BUFFER_SIZE=1000000
 
