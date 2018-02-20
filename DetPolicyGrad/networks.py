@@ -58,9 +58,7 @@ class ActorNetwork(Network):
         self.scope = "actor-"+self.target
         with tf.variable_scope(self.scope) as scope:
             self.inputs = tf.placeholder(dtype=tf.float32,
-                                         shape=[None, self.datacontainer.num_assets, self.datacontainer.num_features])
-            inputs = tf.reshape(self.inputs,
-                                shape=[-1, self.datacontainer.num_assets * self.datacontainer.num_features])
+                                         shape=[None, self.datacontainer.num_flattened_features])
             self.is_training = tf.placeholder(dtype=tf.bool,
                                               shape=None)
             if self.batch_norm:
@@ -68,7 +66,7 @@ class ActorNetwork(Network):
             else:
                 use_bias = True
 
-            net = tf.layers.dense(inputs=inputs,
+            net = tf.layers.dense(inputs=self.inputs,
                                   units=200,
                                   activation=None,
                                   use_bias=use_bias,
@@ -157,9 +155,7 @@ class CriticNetwork(Network):
         self.scope = "critic"+self.target
         with tf.variable_scope(self.scope) as scope:
             self.inputs = tf.placeholder(dtype=tf.float32,
-                                         shape=[None, self.datacontainer.num_assets, self.datacontainer.num_features])
-            inputs = tf.reshape(self.inputs,
-                                shape=[-1, self.datacontainer.num_assets * self.datacontainer.num_features])
+                                         shape=[None, self.datacontainer.num_flattened_features])
             self.actions = tf.placeholder(dtype=tf.float32,
                                           shape=[None, self.datacontainer.num_assets])
             self.is_training = tf.placeholder(dtype=tf.bool,
@@ -170,7 +166,7 @@ class CriticNetwork(Network):
             else:
                 use_bias = True
 
-            net = tf.layers.dense(inputs=inputs,
+            net = tf.layers.dense(inputs=self.inputs,
                                   units=200,
                                   activation=None,
                                   use_bias=use_bias,

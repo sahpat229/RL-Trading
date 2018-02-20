@@ -8,7 +8,7 @@ from networks import ActorNetwork, CriticNetwork
 from replaybuffer import ReplayBuffer
 from tradingstatemodel import TradingStateModel 
 
-NUM_EPISODES = 100
+NUM_EPISODES = 1
 EPISODE_LENGTH = 50
 COMMISSION_PERCENTAGE = 0.0
 BATCH_SIZE = 64
@@ -16,11 +16,11 @@ BATCH_NORM = True
 BUFFER_SIZE=1000000
 
 tc = TestContainer(num_samples=5000)
+tc.plot_prices(train=True)
 tsm = TradingStateModel(datacontainer=tc,
                         episode_length=EPISODE_LENGTH,
                         is_training=True,
                         commission_percentage=COMMISSION_PERCENTAGE)
-print("ASSETS:", tc.num_assets, "FEATURES:", tc.num_features)
 
 sess = tf.Session()
 actor_target = ActorNetwork(sess=sess,

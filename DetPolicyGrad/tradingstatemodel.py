@@ -10,6 +10,12 @@ class State():
     @property
     def prices(self):
         return self.asset_features[:, 0]
+
+    @property
+    def features(self):
+        asset_features = self.asset_features.flatten()
+        return np.concatenate((asset_features, self.portfolio_allocation),
+                              axis=0)    
     
 class TradingStateModel():
     def __init__(self, datacontainer, episode_length, is_training, commission_percentage):
@@ -27,8 +33,8 @@ class TradingStateModel():
         initial_portfolio = np.zeros(self.datacontainer.num_assets)
         initial_portfolio[0] = 1
 
-        self.state = State(asset_features=self.datacontainer.get_features(train=self.is_training,
-                                                                          time=self.time),
+        self.state = State(asset_features=self.datacontainer.get_asset_features(train=self.is_training,
+                                                                                time=self.time),
                            portfolio_allocation=initial_portfolio,
                            terminated=False)
         return self.state, 0
@@ -44,19 +50,24 @@ class TradingStateModel():
         else:
             terminated = False
 
-        new_state = State(asset_features=self.datacontainer.get_features(train=self.is_training,
-                                                                         time=self.time),
+        new_state = State(asset_features=self.datacontainer.get_asset_features(train=self.is_training,
+                                                                               time=self.time),
                           portfolio_allocation=new_portfolio,
                           terminated=terminated)
-        reward = self.reward(curr_state=self.state,
-                             new_state=new_state,
-                             commission_percentage=self.commission_percentage)
+        reward, new_portfolio = self.reward(curr_state=self.state,
+                                            new_state=new_state,
+                                            commission_percentage=self.commission_percentage)
+        new_state.portfolio_allocation = new_portfolio
         self.state = new_state
         return new_state, reward
 
     def reward(self, curr_state, new_state, commission_percentage):
-        total_diff = np.sum(np.abs(new_state.portfolio_allocation - curr_state.portfolio_allocation))
+        diffs = np.abs(new_state.portfolio_allocation - curr_state.portfolio_allocation)
+        commission_rate = commission_percentage / 100.0
+        after_commission = new_state.portfolio_allocation - (commission_rate * diffs)
         price_ratio = new_state.prices / curr_state.prices
-        commission_rate = commission_percentage / 100
-        reward = (1 - commission_rate) * np.dot(new_state.portfolio_allocation, price_ratio)
-        return reward - 1
+        after_price_changes = price_ratio * after_commission
+
+        new_portfolio = after_price_changes / np.sum(after_price_changes)
+        reward = np.sum(after_price_changes) - 1
+        return reward, new_portfolio

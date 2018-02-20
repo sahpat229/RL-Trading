@@ -27,8 +27,12 @@ class Container():
         return self.test_data.shape[1]
 
     @property
-    def num_features(self):
+    def num_asset_features(self):
         return self.train_data.shape[2]
+
+    @property
+    def num_flattened_features(self):
+        return self.num_assets * self.num_asset_features + self.num_assets
 
     def get_data(self, train=True):
         if train:
@@ -41,14 +45,19 @@ class Container():
             init_time = np.random.randint(low=0,
                                           high=self.train_length - episode_length)
         else:
-            init_time = np.random.randint(low=0,
-                                          high=self.test_length - episode_length)
+            init_time = 0
         end_time = init_time + episode_length
         return init_time, end_time 
 
-    def get_features(self, train, time):
+    def get_asset_features(self, train, time):
         data = self.get_data(train=train)
         return data[:, time, :]
+
+    def plot_prices(self, train):
+        data = self.get_data(train=train)
+        for ind in range(data.shape[0]):
+            plt.plot(data[ind, :, 0])
+        plt.show()
 
 class TestContainer(Container):
     def __init__(self, shape='sine', num_assets=3, num_samples=200, train_split=0.7):
@@ -57,7 +66,9 @@ class TestContainer(Container):
         if shape is 'sine':
             closes = [np.sin(2*np.pi*np.linspace(start=0, # [num_assets, num_samples]
                                                  stop=8,
-                                                 num=num_samples))+(np.pi/8)*asset for asset in range(num_assets)]
+                                                 num=num_samples)+(5*np.pi/8)*asset) for asset in range(num_assets)]
+            closes = np.array(closes)
+            closes = closes+100
         data = self.featurize(closes)
 
         split_level = int(num_samples * train_split)
