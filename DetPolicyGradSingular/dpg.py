@@ -80,12 +80,16 @@ class DDPG():
             epsiode_rewards.append(np.sum(rewards))
             if epsilon > 0.1:
                 epsilon -= 2.0 / self.num_episodes
+
+            if (episode % 1) == 0:
+                self.infer(train=False, episode=episode)
+
         plt.plot(epsiode_rewards)
-        plt.show()
+        plt.savefig("./episode_rewards.png")
 
-        self.infer(train=False)
+        self.infer(train=False, episode=episode)
 
-    def infer(self, train):
+    def infer(self, train, episode):
         if not train:
             episode_length = self.datacontainer.test_length - 1
             tsm = TradingStateModel(datacontainer=self.datacontainer,
@@ -125,4 +129,4 @@ class DDPG():
             dataset = 'Train' if train else 'Test'
             title = '{}, Total Reward: {}'.format(dataset,
                                                   np.sum(rewards))
-            plt.show()
+            plt.savefig("./infer"+str(episode)+".png")
