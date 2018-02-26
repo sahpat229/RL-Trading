@@ -69,7 +69,7 @@ class DDPG():
             state = np.reshape(state, (self.actor_trainer.state_dimension, ))
             episode_rewards = 0
             episode_ave_max_q = 0
-            for _ in tqdm(range(self.episode_length)):
+            for _ in range(self.episode_length):
                 action = self.actor_trainer.select_action(inputs=np.array([state]))[0] + self.actor_noise() # [action_dim]
                 trans_state, reward, terminal, info = self.env.step(action)
                 trans_state = np.reshape(trans_state, (self.actor_trainer.state_dimension, ))
@@ -109,13 +109,14 @@ class DDPG():
                 state = trans_state
 
                 if terminal:
+                    print("Episode number:", episode)
                     summary = self.sess.run(self.summary_ops, feed_dict={self.episode_reward: episode_rewards})
-                    self.writer.add_summary(summary, global_step)
+                    self.writer.add_summary(summary, episode)
                     print("Reward:", episode_rewards)
                     break
 
-                summary = self.sess.run(self.summary_ops, feed_dict={self.episode_reward: episode_rewards})
-                self.writer.add_summary(summary, global_step)
+            # summary = self.sess.run(self.summary_ops, feed_dict={self.episode_reward: episode_rewards})
+            # self.writer.add_summary(summary, global_step)
 
         #     epsiode_rewards.append(np.sum(rewards))
         #     if epsilon > 0.1:
