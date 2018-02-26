@@ -1,10 +1,10 @@
 import matplotlib
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 
 import numpy as np
 import tensorflow as tf
 
-from datacontainer import TestContainer
+from datacontainer import TestContainer, BitcoinTestContainer
 from dpg import DDPG
 from networks import ActorNetwork, CriticNetwork
 from replaybuffer import ReplayBuffer
@@ -18,8 +18,9 @@ BATCH_NORM = True
 BUFFER_SIZE=1000000
 COIN_BOUNDARY = 5
 
-tc = TestContainer(num_assets=1, num_samples=5000)
-#tc.plot_prices(train=True)
+#tc = TestContainer(num_assets=1, num_samples=5000)
+tc = BitcoinTestContainer(csv_file_name='../data/csvs/output.csv')
+tc.plot_prices(train=True)
 tsm = TradingStateModel(datacontainer=tc,
                         episode_length=EPISODE_LENGTH,
                         is_training=True,

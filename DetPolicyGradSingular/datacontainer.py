@@ -40,6 +40,12 @@ class Container():
         else:
             return self.test_data
 
+    def get_prices(self, train=True):
+        if train:
+            return self.train_close 
+        else:
+            return self.test_close 
+
     def initial_time(self, train=True, episode_length=None):
         if train:
             init_time = np.random.randint(low=0,
@@ -53,10 +59,14 @@ class Container():
         data = self.get_data(train=train)
         return data[:, time, :]
 
+    def get_price(self, train, time):
+        prices = self.get_prices(train=train)
+        return prices[0, time, 0]
+
     def plot_prices(self, train):
-        data = self.get_data(train=train)
-        for ind in range(data.shape[0]):
-            plt.plot(data[ind, :, 0])
+        prices = self.get_prices(train=train)
+        for ind in range(prices.shape[0]):
+            plt.plot(prices[ind, :, 0])
         plt.show()
 
 class TestContainer(Container):
@@ -121,14 +131,28 @@ class BitcoinTestContainer(Container):
         rsi = RSI(df, timeperiod=14)
         atr = ATR(df, timeperiod=14)
 
-        data = np.column_stack((close, diff, sma15, close-sma15, sma15-sma60, rsi, atr))
+        data = np.column_stack((diff, sma15, close-sma15, sma15-sma60, rsi, atr))
         data = np.nan_to_num(data) 
-        return np.array([data]), np.array([close]) # [1, num_periods, num_features], [1, num_periods]
+        return np.array(data), np.expand_dims(close, 1) # [num_periods, num_features], [num_periods, 1]
 
     def process(self, train_df, test_df):
         self.pre_train_data, self.pre_train_close = self.featurize(train_df)
         self.pre_test_data, self.pre_test_close = self.featurize(test_df)
 
-        scaler = preprocessing.MinMaxScaler()
-        self.train_data = scaler.fit_transform(self.pre_train_data) # [1, num_periods, features]
-        self.test_data = scaler.transform(self.test_data)
+        self.feature_scaler = preprocessing.MinMaxScaler()
+        self.train_data = self.feature_scaler.fit_transform(self.pre_train_data) # [num_periods, features]
+        self.test_data = self.feature_scaler.transform(self.pre_test_data)
+
+        self.pre_train_data, self.pre_test_data, self.train_data, self.test_data = \
+            [np.array([arr]) for arr in [self.pre_train_data, self.pre_test_data, self.train_data, self.test_data]]
+        # [1, num_periods, num_features]
+
+        self.price_scaler = preprocessing.MinMaxScaler()
+        self.train_close = self.feature_scaler.fit_transform(self.pre_train_close)
+        self.test_close = self.feature_scaler.transform(self.pre_test_close)
+
+        self.pre_train_close, self.pre_test_close, self.train_close, self.test_close = \
+            [np.array([arr]) for arr in [self.pre_train_close, self.pre_test_close, self.train_close, self.test_close]]
+        # [1, num_periods, 1]
+
+

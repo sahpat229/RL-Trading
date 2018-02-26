@@ -2,14 +2,11 @@ import datacontainer as dc
 import numpy as np
 
 class State():
-    def __init__(self, asset_features, coins, terminated):
+    def __init__(self, asset_features, price, coins, terminated):
         self.asset_features = asset_features # [1, num_features]
         self.coins = coins
         self.terminated = terminated
-
-    @property
-    def prices(self):
-        return self.asset_features[:, 0]
+        self.price = price
 
     @property
     def features(self):
@@ -36,6 +33,8 @@ class TradingStateModel():
                                       high=self.coin_boundary)
         self.state = State(asset_features=self.datacontainer.get_asset_features(train=self.is_training,
                                                                                 time=self.time),
+                           price=self.datacontainer.get_price(train=self.is_training,
+                                                              time=self.time),
                            coins=num_coins,
                            terminated=False)
         return self.state, 0
@@ -52,6 +51,8 @@ class TradingStateModel():
             terminated = False
         new_state = State(asset_features=self.datacontainer.get_asset_features(train=self.is_training,
                                                                                time=self.time),
+                          price=self.datacontainer.get_price(train=self.is_training,
+                                                             time=self.time),
                           coins=new_num_coins,
                           terminated=terminated)
         reward = self.reward(curr_state=self.state,
@@ -62,5 +63,5 @@ class TradingStateModel():
 
     def reward(self, curr_state, new_state, commission_percentage):
         commission_rate = commission_percentage / 100.0
-        reward = new_state.coins * (new_state.prices[0]/curr_state.prices[0] - 1)
+        reward = new_state.coins * (new_state.price/curr_state.price - 1)
         return reward

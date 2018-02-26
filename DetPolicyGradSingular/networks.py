@@ -3,14 +3,12 @@ import tensorflow as tf
 
 class Network():
     def __init__(self, sess, batch_size, batch_norm=False, learning_rate=1e-3,
-                 dropout=0.5, history_length=50, datacontainer=None, epochs=50,
-                 is_target=True):
+                 dropout=0.5, epochs=50, is_target=True):
         self.sess = sess
         self.batch_size = batch_size
         self.batch_norm = batch_norm
         self.learning_rate=learning_rate
         self.dropout = dropout
-        self.datacontainer = datacontainer
         self.epochs = epochs
         self.target = "target" if is_target else "trainer"
 
@@ -41,33 +39,31 @@ class ActorNetwork(Network):
     Non-recurrent Actor Network, computes mu(s)
     """
     def __init__(self, sess, batch_size, batch_norm=False, learning_rate=1e-3,
-                 dropout=0.5, history_length=50, datacontainer=None, epochs=50,
-                 is_target=True, coin_boundary=5):
+                 dropout=0.5, epochs=50, is_target=True, state_boundary=5,
+                 state_dimension=None, action_dimension=None):
         super().__init__(sess=sess,
                          batch_size=batch_size,
                          batch_norm=batch_norm,
                          learning_rate=learning_rate,
                          dropout=dropout,
-                         history_length=history_length,
-                         datacontainer=datacontainer,
                          epochs=epochs,
                          is_target=is_target)
-        self.coin_boundary = coin_boundary
+        self.state_boundary = state_boundary
+        self.state_dimension = state_dimension
+        self.action_dimension = action_dimension
         self.build_model()
 
     def build_model(self):
         self.scope = "actor-"+self.target
         with tf.variable_scope(self.scope) as scope:
             self.inputs = tf.placeholder(dtype=tf.float32,
-                                         shape=[None, self.datacontainer.num_flattened_features])
-            print(self.inputs.shape)
+                                         shape=[None, self.state_dimension])
             self.is_training = tf.placeholder(dtype=tf.bool,
                                               shape=None)
             if self.batch_norm:
                 use_bias = False
             else:
                 use_bias = True
-
             net = tf.layers.dense(inputs=self.inputs,
                                   units=200,
                                   activation=None,
@@ -95,17 +91,17 @@ class ActorNetwork(Network):
             w_init = tf.random_uniform_initializer(minval=-3e-3,
                                                    maxval=3e-3)
             net = tf.layers.dense(inputs=net,
-                                  units=1,
+                                  units=self.action_dimension,
                                   activation=tf.nn.tanh,
                                   use_bias=True,
                                   kernel_initializer=w_init,
                                   trainable=True)
-            self.output = tf.scalar_mul(self.coin_boundary, net)
+            self.output = tf.scalar_mul(self.state_boundary, net)
 
             network_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
                                                self.scope)
             self.action_gradient = tf.placeholder(dtype=tf.float32,
-                                                  shape=[None, self.datacontainer.num_assets])
+                                                  shape=[None, self.action_dimension])
             unnormalized_action_gradients = tf.gradients(self.output,
                                                          network_params,
                                                          -self.action_gradient)
@@ -140,26 +136,26 @@ class ActorNetwork(Network):
 
 class CriticNetwork(Network):
     def __init__(self, sess, batch_size, batch_norm=False, learning_rate=1e-3,
-                 dropout=0.5, history_length=50, datacontainer=None, epochs=50,
-                 is_target=True):
+                 dropout=0.5, epochs=50, is_target=True, state_dimension=None,
+                 action_dimension=None):
         super().__init__(sess=sess,
                          batch_size=batch_size,
                          batch_norm=batch_norm,
                          learning_rate=learning_rate,
                          dropout=dropout,
-                         history_length=history_length,
-                         datacontainer=datacontainer,
                          epochs=epochs,
                          is_target=is_target)
+        self.state_dimension = state_dimension
+        self.action_dimension = action_dimension
         self.build_model()
 
     def build_model(self):
         self.scope = "critic"+self.target
         with tf.variable_scope(self.scope) as scope:
             self.inputs = tf.placeholder(dtype=tf.float32,
-                                         shape=[None, self.datacontainer.num_flattened_features])
+                                         shape=[None, self.state_dimension])
             self.actions = tf.placeholder(dtype=tf.float32,
-                                          shape=[None, 1])
+                                          shape=[None, self.action_dimension])
             self.is_training = tf.placeholder(dtype=tf.bool,
                                               shape=None)
 
@@ -167,7 +163,6 @@ class CriticNetwork(Network):
                 use_bias = False
             else:
                 use_bias = True
-
             net = tf.layers.dense(inputs=self.inputs,
                                   units=200,
                                   activation=None,
@@ -234,6 +229,7 @@ class CriticNetwork(Network):
                                     self.actions: actions,
                                     self.is_training: False
                                 })
+        #print(q_value.shape)
         return q_value
 
     def get_action_gradients(self, inputs, actions):

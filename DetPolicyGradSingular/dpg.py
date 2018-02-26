@@ -56,7 +56,7 @@ class DDPG():
                     transitions = self.rpb.sample(batch_size=self.batch_size,
                                                   recurrent=False)
                     batch_states = [] # [batch_size, num_assets, num_features]
-                    batch_actions = [] # [batch_size, num_assets]
+                    batch_actions = [] # [batch_size, 1]
                     batch_y = [] # [batch_size, 1]
                     for transition in transitions:
                         old_state, action, reward, new_state = transition
@@ -64,6 +64,7 @@ class DDPG():
                         target_q = self.critic_target.get_q_value(inputs=np.array([new_state.features]),
                                                                   actions=target_action)[0]
                         y = reward + self.gamma * target_q
+                        #print("Y:", y)
                         #print("Y:", y, "Target_q:", target_q, "Target_action:", target_action, "reward:", reward)
                         batch_y.append(y)
                         batch_states.append(old_state.features)
@@ -101,15 +102,15 @@ class DDPG():
                                     commission_percentage=self.tsm.commission_percentage,
                                     coin_boundary=self.tsm.coin_boundary)
             state, reward = tsm.initialize()
-            prices = [state.prices] # [episode_length, num_assets]
+            prices = [state.price] # [episode_length]
             rewards = [reward] # [episode_length]
-            coins = [state.coins] # [episode_length, num_assets]
+            coins = [state.coins] # [episode_length]
 
             for _ in tqdm(range(episode_length)):
                 action = self.actor_target.select_action(inputs=np.array([state.features]))[0][0]
                 #action = self.random_action()
                 trans_state, reward = tsm.step(action)
-                prices.append(trans_state.prices)
+                prices.append(trans_state.price)
                 rewards.append(reward)
                 coins.append(trans_state.coins)
                 state = trans_state
@@ -120,8 +121,7 @@ class DDPG():
 
             f, axarr = plt.subplots(3, sharex=True)
             axarr[0].set_ylabel('Price')
-            for ind in range(prices.shape[1]):
-                axarr[0].plot(prices[:, ind])
+            axarr[0].plot(prices)
 
             axarr[1].set_ylabel('Cumulative Reward')
             axarr[1].plot(np.cumsum(rewards))

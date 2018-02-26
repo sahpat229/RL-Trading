@@ -18,6 +18,14 @@ class ReplayBuffer():
             self.buffer.popleft()
             self.buffer.append(experience)
 
+    def store_w_terminal(self, old_state, action, reward, terminal, new_state):
+        experience = [old_state, action, reward, terminal, new_state]
+        if len(self.buffer) < self.buffer_size:
+            self.buffer.append(experience)
+        else:
+            self.buffer.popleft()
+            self.buffer.append(experience)
+
     def sample(self, batch_size, recurrent=False, time_steps=None):
         """
         Sample the replay buffer.  Should only be sampled when the replay buffer is full.
@@ -43,6 +51,29 @@ class ReplayBuffer():
                 batch_samples.append(time_samples)
                 
             return batch_samples
+
+    def sample_batch(self, batch_size):
+        if not self.ready(batch_size=batch_size):
+            raise ReplayBufferException('Replay Buffer should only be sampled when having batch_size amount of samples.') 
+
+        indices = np.random.randint(low=0,
+                                    high=len(self.buffer),
+                                    size=batch_size)
+        batch_states = [] # [batch_size, state_dim]
+        batch_actions = [] # [batch_size, action_dim]
+        batch_rewards = [] # [batch_size]
+        batch_terminal = [] # [batch_size]
+        batch_new_states = [] # [batch_size, state_dim]
+        for ind in indices:
+            state, action, reward, terminal, new_state = self.buffer[ind]
+            batch_states.append(state)
+            batch_actions.append(action)
+            batch_rewards.append(reward)
+            batch_terminal.append(terminal)
+            batch_new_states.append(new_state)
+
+        return np.array(batch_states), np.array(batch_actions), np.array(batch_rewards), \
+            batch_terminal, np.array(batch_new_states)
 
     def clear(self):
         self.buffer.clear()
