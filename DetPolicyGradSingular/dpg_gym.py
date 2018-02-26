@@ -62,6 +62,7 @@ class DDPG():
         self.summary_ops = tf.summary.merge_all()
 
     def train(self):
+        global_step = 0
         training_rewards = []
         for episode in range(1, self.num_episodes+1):
             state = self.env.reset()
@@ -104,13 +105,17 @@ class DDPG():
                     ActorNetwork.update_actor(self.sess, self.tau)
                     CriticNetwork.update_critic(self.sess, self.tau)
 
+                global_step += 1
                 state = trans_state
 
                 if terminal:
-                    self.sess.run(self.summary_ops, feed_dict={self.episode_reward: episode_rewards})
+                    summary = self.sess.run(self.summary_ops, feed_dict={self.episode_reward: episode_rewards})
+                    self.writer.add_summary(summary, global_step)
                     print("Reward:", episode_rewards)
                     break
-                self.sess.run(self.summary_ops, feed_dict={self.episode_reward: episode_rewards})
+
+                summary = self.sess.run(self.summary_ops, feed_dict={self.episode_reward: episode_rewards})
+                self.writer.add_summary(summary, global_step)
 
         #     epsiode_rewards.append(np.sum(rewards))
         #     if epsilon > 0.1:

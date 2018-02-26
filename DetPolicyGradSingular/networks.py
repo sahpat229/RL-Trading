@@ -150,7 +150,7 @@ class CriticNetwork(Network):
         self.build_model()
 
     def build_model(self):
-        self.scope = "critic"+self.target
+        self.scope = "critic-"+self.target
         with tf.variable_scope(self.scope) as scope:
             self.inputs = tf.placeholder(dtype=tf.float32,
                                          shape=[None, self.state_dimension])
