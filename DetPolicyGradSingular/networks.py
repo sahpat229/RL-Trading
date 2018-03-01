@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+import tflearn
 
 class Network():
     def __init__(self, sess, batch_size, batch_norm=False, learning_rate=1e-3,
@@ -51,7 +52,7 @@ class ActorNetwork(Network):
         self.state_boundary = state_boundary
         self.state_dimension = state_dimension
         self.action_dimension = action_dimension
-        self.build_model()
+        self.build_model_tflearn()
 
     def build_model(self):
         self.scope = "actor-"+self.target
@@ -113,19 +114,48 @@ class ActorNetwork(Network):
                 self.optimizer = tf.train.AdamOptimizer(self.learning_rate).\
                     apply_gradients(zip(self.actor_gradients, network_params))
 
+    def build_model_tflearn(self):
+        self.scope = "actor-"+self.target
+        with tf.variable_scope(self.scope) as scope:
+            self.inputs = tflearn.input_data(shape=[None, self.state_dimension])
+            net = tflearn.fully_connected(self.inputs, 400)
+            #net = tflearn.layers.normalization.batch_normalization(net)
+            net = tflearn.activations.relu(net)
+            net = tflearn.fully_connected(net, 300)
+            #net = tflearn.layers.normalization.batch_normalization(net)
+            net = tflearn.activations.relu(net)
+            # Final layer weights are init to Uniform[-3e-3, 3e-3]
+            w_init = tflearn.initializations.uniform(minval=-0.003, maxval=0.003)
+            out = tflearn.fully_connected(
+                net, self.action_dimension, activation='tanh', weights_init=w_init)
+            # Scale output to -action_bound to action_bound
+            self.output = tf.multiply(out, self.state_boundary)
+
+            network_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
+                                               self.scope)
+            self.action_gradient = tf.placeholder(dtype=tf.float32,
+                                                  shape=[None, self.action_dimension])
+            unnormalized_action_gradients = tf.gradients(self.output,
+                                                         network_params,
+                                                         -self.action_gradient)
+            self.actor_gradients = list(map(lambda x: tf.div(x, self.batch_size), unnormalized_action_gradients))
+            # Optimization Op
+            self.optimizer = tf.train.AdamOptimizer(self.learning_rate).\
+                apply_gradients(zip(self.actor_gradients, network_params))
+
     def train_step(self, inputs, action_gradient):
         self.sess.run(self.optimizer,
                       feed_dict={
                           self.inputs: inputs,
-                          self.action_gradient: action_gradient,
-                          self.is_training: True
+                          self.action_gradient: action_gradient
+                          # self.is_training: True
                       })
 
     def select_action(self, inputs):
         output = self.sess.run(self.output,
                                feed_dict= {
-                                   self.inputs: inputs,
-                                   self.is_training: False
+                                   self.inputs: inputs
+                                   # self.is_training: False
                                    })
         return output # size is [batch_size, num_assets]
 
@@ -147,7 +177,7 @@ class CriticNetwork(Network):
                          is_target=is_target)
         self.state_dimension = state_dimension
         self.action_dimension = action_dimension
-        self.build_model()
+        self.build_model_tflearn()
 
     def build_model(self):
         self.scope = "critic-"+self.target
@@ -211,13 +241,44 @@ class CriticNetwork(Network):
                                                                                      var_list=model_variables)
             self.action_gradients = tf.gradients(self.output, self.actions)
 
+    def build_model_tflearn(self):
+        self.scope = "critic-"+self.target
+        with tf.variable_scope(self.scope) as scope:
+            self.inputs = tflearn.input_data(shape=[None, self.state_dimension])
+            self.actions = tflearn.input_data(shape=[None, self.action_dimension])
+            net = tflearn.fully_connected(self.inputs, 400)
+            #net = tflearn.layers.normalization.batch_normalization(net)
+            net = tflearn.activations.relu(net)
+
+            # Add the action tensor in the 2nd hidden layer
+            # Use two temp layers to get the corresponding weights and biases
+            t1 = tflearn.fully_connected(net, 300)
+            t2 = tflearn.fully_connected(self.actions, 300)
+
+            net = tflearn.activation(
+                tf.matmul(net, t1.W) + tf.matmul(self.actions, t2.W) + t2.b, activation='relu')
+
+            # linear layer connected to 1 output representing Q(s,a)
+            # Weights are init to Uniform[-3e-3, 3e-3]
+            w_init = tflearn.initializations.uniform(minval=-0.003, maxval=0.003)
+            self.output = tflearn.fully_connected(net, 1, weights_init=w_init)
+            self.predicted_q_value = tf.placeholder(dtype=tf.float32,
+                                                    shape=[None, 1])
+            self.loss = tf.square(self.output - self.predicted_q_value)
+            self.loss = tf.reduce_mean(self.loss)
+            model_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
+                                                self.scope)
+            self.optimizer = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss,
+                                                                                 var_list=model_variables)
+            self.action_gradients = tf.gradients(self.output, self.actions)
+
     def train_step(self, inputs, actions, predicted_q_value):
         loss, _ = self.sess.run([self.loss, self.optimizer],
                                 feed_dict={
                                     self.inputs: inputs,
                                     self.actions: actions,
-                                    self.predicted_q_value: predicted_q_value,
-                                    self.is_training: True
+                                    self.predicted_q_value: predicted_q_value
+                                    # self.is_training: True
                                 })
         #print("LOSS:", loss)
         return loss
@@ -226,8 +287,8 @@ class CriticNetwork(Network):
         q_value = self.sess.run(self.output,
                                 feed_dict={
                                     self.inputs: inputs,
-                                    self.actions: actions,
-                                    self.is_training: False
+                                    self.actions: actions
+                                    # self.is_training: False
                                 })
         #print(q_value.shape)
         return q_value
@@ -236,8 +297,8 @@ class CriticNetwork(Network):
         action_gradients = self.sess.run(self.action_gradients,
                                          feed_dict={
                                             self.inputs: inputs,
-                                            self.actions: actions,
-                                            self.is_training: False
+                                            self.actions: actions
+                                            # self.is_training: False
                                          })
         return action_gradients
 

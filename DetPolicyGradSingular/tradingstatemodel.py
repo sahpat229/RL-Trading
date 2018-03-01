@@ -23,7 +23,7 @@ class TradingStateModel():
         self.commission_percentage = commission_percentage
         self.coin_boundary = coin_boundary
 
-    def initialize(self):
+    def reset(self):
         """
         Returns the initial state and reward
         """
@@ -37,13 +37,13 @@ class TradingStateModel():
                                                               time=self.time),
                            coins=num_coins,
                            terminated=False)
-        return self.state, 0
+        return self.state
 
     def step(self, action):
         """
         Returns the next state and reward received due to action (which is the next portfolio allocation vector)
         """
-        new_num_coins = action
+        new_num_coins = action[0]
         self.time += 1
         if self.time == self.end_time:
             terminated = True
@@ -59,7 +59,7 @@ class TradingStateModel():
                              new_state=new_state,
                              commission_percentage=self.commission_percentage)
         self.state = new_state
-        return new_state, reward
+        return new_state, reward, new_state.terminated, None
 
     def reward(self, curr_state, new_state, commission_percentage):
         commission_rate = commission_percentage / 100.0

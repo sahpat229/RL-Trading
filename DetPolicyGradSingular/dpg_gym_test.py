@@ -7,6 +7,7 @@ import tensorflow as tf
 from dpg_gym import DDPG, OrnsteinUhlenbeckActionNoise
 from networks import ActorNetwork, CriticNetwork
 from replaybuffer import ReplayBuffer 
+from rank_based import Experience
 
 BUFFER_SIZE = 100000
 BATCH_SIZE = 32
@@ -25,6 +26,7 @@ boundary = env.action_space.high[0]
 
 actor_noise = OrnsteinUhlenbeckActionNoise(mu=np.zeros(action_dim))
 rpb = ReplayBuffer(buffer_size=BUFFER_SIZE)
+rpb = Experience()
 
 sess = tf.Session()
 actor_trainer = ActorNetwork(sess=sess,

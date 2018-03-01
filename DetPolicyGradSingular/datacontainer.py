@@ -80,10 +80,16 @@ class TestContainer(Container):
             closes = np.array(closes)
             closes = closes+100
         data = self.featurize(closes)
+        closes = data[:, :, 0:1]
+        data = data[:, :, 1:]
 
         split_level = int(num_samples * train_split)
-        self.train_data = data[:, 0:split_level, :]                                                                                                                        
+        self.train_data = data[:, 0:split_level, :]
+        self.train_close = closes[:, 0:split_level, :]                                                                                                                        
         self.test_data = data[:, split_level:, :]
+        self.test_close = closes[:, split_level:, :]
+
+        print("SHAPES:", self.train_data.shape, self.train_close.shape, self.test_data.shape, self.test_close.shape)
 
     def featurize(self, closes):
         all_features = []
@@ -153,6 +159,9 @@ class BitcoinTestContainer(Container):
 
         self.pre_train_close, self.pre_test_close, self.train_close, self.test_close = \
             [np.array([arr]) for arr in [self.pre_train_close, self.pre_test_close, self.train_close, self.test_close]]
+
+        self.train_close = self.pre_train_close
+        self.test_close = self.pre_test_close
         # [1, num_periods, 1]
 
 
