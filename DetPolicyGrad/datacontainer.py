@@ -202,4 +202,21 @@ class BitcoinTestContainer(Container):
         self.test_close = self.pre_test_close
         # [1, num_periods, 1]
 
+class DataContainer(Container):
+    def __init__(self, csv_file_name=None, hdf_file_name=None):
+        if hdf_file_name is not None:
+            key = 'train'
+            pd_data = pd.read_hdf(hdf_file_name, key=key)
+            asset_names = list(pd_data.columns.levels[0])
+            train_closing_prices = [pd_data[asset_name, 'close'].values for asset_name in asset_names]
 
+            key = 'test'
+            pd_data = pd.read_hdf(hdf_file_name, key=key)
+            asset_names = list(pd_data.columns.levels[0])
+            test_closing_prices = [pd_data[asset_name, 'close'].values for asset_name in asset_names]
+
+        self.train_close = np.array(train_closing_prices)
+        self.test_close = np.array(test_closing_prices)
+
+        self.train_data, self.test_data = [self.featurize(closes, {'returns': True}) for closes in
+            [self.train_close, self.test_close]]
