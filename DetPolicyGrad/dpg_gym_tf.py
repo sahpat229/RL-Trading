@@ -115,7 +115,7 @@ class DDPG():
             episode_ave_max_q = 0
             for time_step in range(self.episode_length):
                 action = self.actor.predict(asset_inputs=np.array([state.asset_features]),
-                                            portfolio_inputs=np.array([state.portfolio_allocation]))[0] #+ self.actor_noise()
+                                            portfolio_inputs=np.array([state.portfolio_allocation]))[0] + self.actor_noise()
                 action = softmax(action) # take softmax here
                 trans_state, reward, terminal, info = self.env.step(action)
                 episode_rewards += reward
