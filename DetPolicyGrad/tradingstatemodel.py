@@ -67,11 +67,11 @@ class TradingStateModel():
         else:
             terminated = False
 
-        reward, after_price_changes = self.reward(old_portfolio=self.state.portfolio_allocation,
-                                                  new_portfolio=action,
-                                                  price_returns=self.datacontainer.get_asset_features(train=self.is_training,
-                                                                                                      time=self.time)[:, 0],
-                                                  commission_percentage=self.commission_percentage)
+        reward, after_price_changes, info = self.reward(old_portfolio=self.state.portfolio_allocation,
+                                                        new_portfolio=action,
+                                                        price_returns=self.datacontainer.get_asset_features(train=self.is_training,
+                                                                                                            time=self.time)[:, 0],
+                                                        commission_percentage=self.commission_percentage)
         new_state = State(asset_features=self.datacontainer.get_asset_features(train=self.is_training,
                                                                                time=self.time,
                                                                                history_length=self.history_length),
@@ -80,7 +80,7 @@ class TradingStateModel():
                                                               time=self.time),
                           terminated=terminated)
         self.state = new_state
-        return new_state, reward, new_state.terminated, None # To match OpenAI Gym protocol
+        return new_state, reward, new_state.terminated, info # To match OpenAI Gym protocol
 
     def reward(self, old_portfolio, new_portfolio, price_returns, commission_percentage):
         """
@@ -93,11 +93,13 @@ class TradingStateModel():
 
         pnl = np.dot(new_portfolio, price_returns)
         tc = commission_rate * np.sum(np.abs(new_portfolio - old_portfolio))
-        print("Comission:", tc)
         reward = np.log(1 + pnl - tc)
 
         after_price_changes = new_portfolio * (1 + price_returns) / (1 + pnl - tc) # {a_(t+1)^tilda}_i [num_assets]
-        return reward, after_price_changes
+
+        info = {'pnl': pnl, 'tc': tc}
+
+        return reward, after_price_changes, info
 
     # def reward(self, curr_state, new_state, commission_percentage):
     #     diffs = np.abs(new_state.portfolio_allocation - curr_state.portfolio_allocation)

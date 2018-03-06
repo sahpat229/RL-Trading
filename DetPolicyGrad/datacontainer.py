@@ -1,8 +1,12 @@
+import matplotlib
+matplotlib.use('Agg')
+
 import csv
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import random
+import talib
 
 from sklearn import metrics, preprocessing
 from talib.abstract import *
@@ -218,5 +222,10 @@ class DataContainer(Container):
         self.train_close = np.array(train_closing_prices)
         self.test_close = np.array(test_closing_prices)
 
-        self.train_data, self.test_data = [self.featurize(closes, {'returns': True}) for closes in
+        self.sma15_train, self.sma15_test = [talib.SMA(arr, timeperiod=15) for arr in 
             [self.train_close, self.test_close]]
+
+        self.train_data, self.test_data = [self.featurize(closes, {'returns': True}) for closes in
+            [self.sma15_train, self.sma15_test]]
+        self.train_data, self.test_data = [np.nan_to_num(arr) for arr in
+            [self.train_data, self.test_data]]

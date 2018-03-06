@@ -152,13 +152,13 @@ class CriticNetwork(object):
 
         # Define loss and optimization Op
         self.loss = tf.square(self.predicted_q_value - self.out)
-        loss = tf.multiply(self.weights, self.loss)
-        loss = tf.reduce_mean(loss)
+        self.loss = tf.multiply(self.weights, self.loss)
+        self.loss = tf.reduce_mean(self.loss)
 
         #self.loss = tflearn.mean_square(self.predicted_q_value, self.out)
 
         self.optimize = tf.train.AdamOptimizer(
-            self.learning_rate).minimize(loss)
+            self.learning_rate).minimize(self.loss)
 
         # Get the gradient of the net w.r.t. the action.
         # For each action in the minibatch (i.e., for each x in xs),
@@ -191,7 +191,7 @@ class CriticNetwork(object):
         return asset_inputs, portfolio_inputs, action_inputs, out
 
     def train(self, asset_inputs, portfolio_inputs, action, predicted_q_value, weights):
-        return self.sess.run([self.out, self.optimize], feed_dict={
+        return self.sess.run([self.loss, self.out, self.optimize], feed_dict={
             self.asset_inputs: asset_inputs,
             self.portfolio_inputs: portfolio_inputs,
             self.action: action,

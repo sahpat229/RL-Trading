@@ -1,5 +1,5 @@
 import matplotlib
-#matplotlib.use('Agg')
+matplotlib.use('Agg')
 import gym
 import numpy as np
 import tensorflow as tf
@@ -29,9 +29,9 @@ COMMISSION_PERCENTAGE = 0.0
 # action_dim = env.action_space.shape[0]
 # boundary = env.action_space.high[0]
 
-# dc = TestContainer(num_assets=3,
-#                    num_samples=2000)
-dc = DataContainer(hdf_file_name='../data/hdfs/poloniex_30m.hf')
+dc = TestContainer(num_assets=3,
+                   num_samples=2000)
+#dc = DataContainer(hdf_file_name='../data/hdfs/poloniex_30m.hf')
 #dc = BitcoinTestContainer(csv_file_name='../data/csvs/output.csv')
 env = TradingStateModel(datacontainer=dc,
                         episode_length=EPISODE_LENGTH,
@@ -78,5 +78,7 @@ ddpg = DDPG(sess=sess,
             replay_buffer=rpb, 
             gamma=GAMMA,
             tau=TAU, 
-            actor_noise=actor_noise)
+            actor_noise=actor_noise,
+            tensorboard_directory='./tensorboard_'+str(COMMISSION_PERCENTAGE),
+            infer_directory='./infer_ims_'+str(COMMISSION_PERCENTAGE))
 ddpg.train()
