@@ -49,6 +49,7 @@ class DDPG():
         self.gamma = gamma
         self.tau = tau
         self.actor_noise = actor_noise
+        self.infer_directory = infer_directory
 
         self.sess.run(tf.global_variables_initializer())
         self.actor.assign_target_network()
@@ -91,6 +92,8 @@ class DDPG():
                                              shape=None)
         self.individual_tc = tf.placeholder(dtype=tf.float32,
                                             shape=None)
+        self.individual_estimated_q = tf.placeholder(dtype=tf.float32,
+                                                     shape=None)
         ep_reward = tf.summary.scalar("Episode Reward", self.episode_reward)
         qfunc_loss = tf.summary.scalar("Qfunc Loss", self.qfunc_loss)
         actions = [tf.summary.scalar("Action-"+str(index), self.actions[index]) for
@@ -115,8 +118,13 @@ class DDPG():
             episode_ave_max_q = 0
             for time_step in range(self.episode_length):
                 action = self.actor.predict(asset_inputs=np.array([state.asset_features]),
-                                            portfolio_inputs=np.array([state.portfolio_allocation]))[0] + self.actor_noise()
+                                            portfolio_inputs=np.array([state.portfolio_allocation]))[0]
+                #print("ACTION before:", softmax(action))
+                noise = self.actor_noise()
+                #print("NOISE:", noise)
+                action += noise
                 action = softmax(action) # take softmax here
+                #print("ACTION after:", action)
                 trans_state, reward, terminal, info = self.env.step(action)
                 episode_rewards += reward
 
@@ -271,4 +279,4 @@ class DDPG():
             dataset = 'Train' if train else 'Test'
             title = '{}, Total Reward: {}'.format(dataset,
                                                   np.sum(rewards))
-            plt.savefig("./infer_ims_commission/"+str(episode)+".png")
+            plt.savefig(os.path.join(self.infer_directory, str(episode)+".png"))

@@ -1,7 +1,12 @@
 import argparse
 import time
 import os
+import sys
 import logging
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
+print(sys.path)
+
 from baselines import logger, bench
 from baselines.common.misc_util import (
     set_global_seeds,
@@ -15,6 +20,11 @@ from baselines.ddpg.noise import *
 import gym
 import tensorflow as tf
 from mpi4py import MPI
+from tradingstatemodel import TradingStateModel
+from datacontainer import TestContainer
+
+HISTORY_LENGTH = 50
+COMMISSION_PERCENTAGE = 0.0
 
 def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
     # Configure things.
@@ -23,8 +33,8 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
         logger.set_level(logger.DISABLED)
 
     # Create envs.
-    env = gym.make(env_id)
-    env = bench.Monitor(env, logger.get_dir() and os.path.join(logger.get_dir(), str(rank)))
+    # env = gym.make(env_id)
+    # env = bench.Monitor(env, logger.get_dir() and os.path.join(logger.get_dir(), str(rank)))
 
     if evaluation and rank==0:
         eval_env = gym.make(env_id)
@@ -33,10 +43,18 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
     else:
         eval_env = None
 
+    dc = TestContainer(num_assets=3, num_samples=20000)
+    env = TradingStateModel(datacontainer=dc,
+                            episode_length=kwargs['nb_rollout_steps'],
+                            history_length=HISTORY_LENGTH,
+                            is_training=True,
+                            commission_percentage=COMMISSION_PERCENTAGE)
+
     # Parse noise_type
     action_noise = None
     param_noise = None
-    nb_actions = env.action_space.shape[-1]
+    # nb_actions = env.action_space.shape[-1]
+    nb_actions = env.datacontainer.num_assets
     for current_noise_type in noise_type.split(','):
         current_noise_type = current_noise_type.strip()
         if current_noise_type == 'none':
@@ -54,24 +72,37 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
             raise RuntimeError('unknown noise type "{}"'.format(current_noise_type))
 
     # Configure components.
-    memory = Memory(limit=int(1e6), action_shape=env.action_space.shape, observation_shape=env.observation_space.shape)
-    critic = Critic(layer_norm=layer_norm)
-    actor = Actor(nb_actions, layer_norm=layer_norm)
+    # memory = Memory(limit=int(1e6), action_shape=env.action_space.shape, observation_shape=env.observation_space.shape)
+    memory = Memory(limit=int(1e6), 
+                    action_shape=env.action_space.shape, 
+                    observation_shape=env.observation_space.shape)
+    critic = Critic(num_asset_features=env.datacontainer.total_asset_features(HISTORY_LENGTH), 
+                    num_actions=env.datacontainer.num_assets, 
+                    asset_features_shape=env.asset_features_shape, 
+                    portfolio_features_shape=env.portfolio_features_shape, 
+                    layer_norm=layer_norm)
+    actor = Actor(nb_actions, 
+                  num_asset_features=env.datacontainer.total_asset_features(HISTORY_LENGTH), 
+                  num_actions=env.datacontainer.num_assets, 
+                  asset_features_shape=env.asset_features_shape, 
+                  portfolio_features_shape=env.portfolio_features_shape, 
+                  layer_norm=layer_norm)
 
     # Seed everything to make things reproducible.
     seed = seed + 1000000 * rank
     logger.info('rank {}: seed={}, logdir={}'.format(rank, seed, logger.get_dir()))
     tf.reset_default_graph()
     set_global_seeds(seed)
-    env.seed(seed)
-    if eval_env is not None:
-        eval_env.seed(seed)
+    # env.seed(seed)
+    # if eval_env is not None:
+    #     eval_env.seed(seed)
 
     # Disable logging for rank != 0 to avoid noise.
     if rank == 0:
         start_time = time.time()
     training.train(env=env, eval_env=eval_env, param_noise=param_noise,
-        action_noise=action_noise, actor=actor, critic=critic, memory=memory, **kwargs)
+        action_noise=action_noise, actor=actor, critic=critic, memory=memory, 
+        tensorboard_directory='./tensorboard_'+str(COMMISSION_PERCENTAGE),**kwargs)
     env.close()
     if eval_env is not None:
         eval_env.close()

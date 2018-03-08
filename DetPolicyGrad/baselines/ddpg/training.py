@@ -11,15 +11,50 @@ import numpy as np
 import tensorflow as tf
 from mpi4py import MPI
 
+def build_summaries(num_actions):
+    episode_reward = tf.placeholder(dtype=tf.float32,
+                                    shape=None)
+    qfunc_loss = tf.placeholder(dtype=tf.float32,
+                                shape=None)
+    actions = tf.placeholder(dtype=tf.float32,
+                             shape=[num_actions])
+    prices = tf.placeholder(dtype=tf.float32,
+                            shape=[num_actions])
+    individual_reward = tf.placeholder(dtype=tf.float32,
+                                       shape=None)
+    individual_pnl = tf.placeholder(dtype=tf.float32,
+                                    shape=None)
+    individual_tc = tf.placeholder(dtype=tf.float32,
+                                   shape=None)
+    individual_estimated_q = tf.placeholder(dtype=tf.float32,
+                                            shape=None)
+    sum_episode_reward = tf.summary.scalar("Episode Reward", episode_reward)
+    sum_qfunc_loss = tf.summary.scalar("Qfunc Loss", qfunc_loss)
+    sum_actions = [tf.summary.scalar("Action-"+str(index), actions[index]) for
+        index in range(num_actions)]
+    sum_prices = [tf.summary.scalar("Price-"+str(index), prices[index]) for
+        index in range(num_actions)]
+    sum_individual_reward = tf.summary.scalar("Individual Reward", individual_reward)
+    sum_individual_pnl = tf.summary.scalar("Individiual Pnl", individual_pnl)
+    sum_individual_tc = tf.summary.scalar("Individual Tc", individual_tc)
+    sum_individual_est_q = tf.summary.scalar("Estimated Q", individual_estimated_q)
+
+    episode_summaries = tf.summary.merge([sum_episode_reward])
+    individual_summaries = tf.summary.merge(sum_actions + sum_prices + [sum_individual_reward, 
+                                                 sum_individual_pnl, sum_individual_tc, sum_individual_est_q])
+    batch_summaries = tf.summary.merge([sum_qfunc_loss])
+
+    return episode_summaries, individual_summaries, batch_summaries, \
+        episode_reward, qfunc_loss, actions, prices, individual_reward, individual_pnl, individual_tc, individual_estimated_q
 
 def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, param_noise, actor, critic,
     normalize_returns, normalize_observations, critic_l2_reg, actor_lr, critic_lr, action_noise,
     popart, gamma, clip_norm, nb_train_steps, nb_rollout_steps, nb_eval_steps, batch_size, memory,
-    tau=0.01, eval_env=None, param_noise_adaption_interval=50):
+    tau=0.01, eval_env=None, param_noise_adaption_interval=50, tensorboard_directory=None):
     rank = MPI.COMM_WORLD.Get_rank()
 
-    assert (np.abs(env.action_space.low) == env.action_space.high).all()  # we assume symmetric actions.
-    max_action = env.action_space.high
+    # assert (np.abs(env.action_space.low) == env.action_space.high).all()  # we assume symmetric actions.
+    max_action = 1
     logger.info('scaling actions by {} before executing in env'.format(max_action))
     agent = DDPG(actor, critic, memory, env.observation_space.shape, env.action_space.shape,
         gamma=gamma, tau=tau, normalize_returns=normalize_returns, normalize_observations=normalize_observations,
@@ -35,6 +70,17 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
     else:
         saver = None
 
+    if not os.path.exists(tensorboard_directory):
+        os.makedirs(tensorboard_directory)
+    else:
+        for file in os.listdir(tensorboard_directory):
+            file_path = os.path.join(tensorboard_directory, file)
+            try:
+                if os.path.isfile(file_path):
+                    os.unlink(file_path)
+            except Exception as e:
+                print(e)
+
     step = 0
     episode = 0
     eval_episode_rewards_history = deque(maxlen=100)
@@ -42,17 +88,23 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
     with U.single_threaded_session() as sess:
         # Prepare everything.
         agent.initialize(sess)
+        episode_summaries, individual_summaries, batch_summaries, \
+            episode_reward_pl, qfunc_loss_pl, actions_pl, prices_pl, individual_reward_pl, \
+            individual_pnl_pl, individual_tc_pl, individual_estimated_q_pl = build_summaries(env.action_space.shape[0])
         sess.graph.finalize()
+        writer = tf.summary.FileWriter(tensorboard_directory, sess.graph)
 
         agent.reset()
-        obs = env.reset()
+        obs_state = env.reset()
+        obs = obs_state.features
         if eval_env is not None:
-            eval_obs = eval_env.reset()
+            eval_obs = eval_env.reset().features
         done = False
         episode_reward = 0.
         episode_step = 0
         episodes = 0
         t = 0
+        train_steps = 0
 
         epoch = 0
         start_time = time.time()
@@ -76,22 +128,39 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                     # Execute next action.
                     if rank == 0 and render:
                         env.render()
-                    assert max_action.shape == action.shape
-                    new_obs, r, done, info = env.step(max_action * action)  # scale for execution in env (as far as DDPG is concerned, every action is in [-1, 1])
+                    # assert max_action.shape == action.shape
+                    new_obs_state, r, done, info = env.step(max_action * action)  # scale for execution in env (as far as DDPG is concerned, every action is in [-1, 1])
+                    new_obs = new_obs_state.features
                     t += 1
                     if rank == 0 and render:
                         env.render()
                     episode_reward += r
                     episode_step += 1
 
+                    summary = sess.run(individual_summaries, feed_dict={
+                                        actions_pl: action,
+                                        prices_pl: obs_state.price,
+                                        individual_reward_pl: r,
+                                        individual_pnl_pl: info['pnl'],
+                                        individual_tc_pl: info['tc'],
+                                        individual_estimated_q_pl: q[0, 0]
+                                    })
+                    writer.add_summary(summary, t)
+
                     # Book-keeping.
                     epoch_actions.append(action)
                     epoch_qs.append(q)
                     agent.store_transition(obs, action, r, new_obs, done)
                     obs = new_obs
+                    obs_state = new_obs_state
 
                     if done:
                         # Episode done.
+                        summary = sess.run(episode_summaries, feed_dict={
+                                            episode_reward_pl: episode_reward
+                                        })
+                        writer.add_summary(summary, episodes)
+
                         epoch_episode_rewards.append(episode_reward)
                         episode_rewards_history.append(episode_reward)
                         epoch_episode_steps.append(episode_step)
@@ -101,19 +170,25 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                         episodes += 1
 
                         agent.reset()
-                        obs = env.reset()
+                        obs_state = env.reset()
+                        obs = obs_state.features
 
                 # Train.
                 epoch_actor_losses = []
                 epoch_critic_losses = []
                 epoch_adaptive_distances = []
                 for t_train in range(nb_train_steps):
+                    train_steps += 1
                     # Adapt param noise, if necessary.
                     if memory.nb_entries >= batch_size and t_train % param_noise_adaption_interval == 0:
                         distance = agent.adapt_param_noise()
                         epoch_adaptive_distances.append(distance)
 
                     cl, al = agent.train()
+                    summary = sess.run(batch_summaries, feed_dict={
+                                        qfunc_loss_pl: cl
+                                    })
+                    writer.add_summary(summary, train_steps)
                     epoch_critic_losses.append(cl)
                     epoch_actor_losses.append(al)
                     agent.update_target_net()
@@ -126,13 +201,14 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                     for t_rollout in range(nb_eval_steps):
                         eval_action, eval_q = agent.pi(eval_obs, apply_noise=False, compute_Q=True)
                         eval_obs, eval_r, eval_done, eval_info = eval_env.step(max_action * eval_action)  # scale for execution in env (as far as DDPG is concerned, every action is in [-1, 1])
+                        eval_obs = eval_obs.features
                         if render_eval:
                             eval_env.render()
                         eval_episode_reward += eval_r
 
                         eval_qs.append(eval_q)
                         if eval_done:
-                            eval_obs = eval_env.reset()
+                            eval_obs = eval_env.reset().features
                             eval_episode_rewards.append(eval_episode_reward)
                             eval_episode_rewards_history.append(eval_episode_reward)
                             eval_episode_reward = 0.
@@ -143,6 +219,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
             duration = time.time() - start_time
             stats = agent.get_stats()
             combined_stats = stats.copy()
+            print("EPOCH_EPISODE_REWARDS:", len(epoch_episode_rewards))
             combined_stats['rollout/return'] = np.mean(epoch_episode_rewards)
             combined_stats['rollout/return_history'] = np.mean(episode_rewards_history)
             combined_stats['rollout/episode_steps'] = np.mean(epoch_episode_steps)

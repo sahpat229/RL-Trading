@@ -45,6 +45,14 @@ class Container():
     def num_flattened_features(self):
         return self.num_assets * self.num_asset_features + self.num_assets
 
+    @staticmethod
+    def split(closes, data, split_level):
+        train_close = closes[:, 0:split_level]
+        test_close = closes[:, split_level:]
+        train_data = data[:, 0:split_level, :]
+        test_data = data[:, split_level:, :]
+        return train_data, test_data, train_close, test_close
+
     def get_data(self, train=True):
         if train:
             return self.train_data
@@ -84,6 +92,12 @@ class Container():
         else:
             return prices[:, time-history_length+1:time+1] # [num_assets, history_length]
 
+    def get_price_returns(self, train, time):
+        curr_prices = self.get_prices(train=train, time=time)
+        old_prices = self.get_prices(train=train, time=time-1)
+        returns = (curr_prices - old_prices) / old_prices
+        return returns
+
     def plot_prices(self, train):
         prices = self.get_all_prices(train=train)
         for ind in range(prices.shape[0]):
@@ -112,6 +126,7 @@ class Container():
             returns = diff / closes[:, 0:num_periods-1]
             returns = np.concatenate((np.zeros((num_assets, 1)), returns),
                                      axis=1) # [num_assets, num_periods]
+            #returns = np.log(1  + returns)
             features.append(returns)
 
         if len(features) == 0:
@@ -132,6 +147,8 @@ class TestContainer(Container):
                                                  num=num_samples)+(5*np.pi/8)*asset) for asset in range(num_assets)]
             closes = np.array(closes)
             closes = closes+5
+            # closes = np.concatenate((np.ones((1, num_samples)), closes),
+            #                         axis=0)
 
         data = self.featurize(closes,
                               conf={'returns': True}) # [num_assets, num_samples, num_asset_features]
@@ -141,6 +158,20 @@ class TestContainer(Container):
         self.train_close = closes[:, 0:split_level]                                                                                                                        
         self.test_data = data[:, split_level:, :]
         self.test_close = closes[:, split_level:]
+
+class EasyContainer(Container):
+    def __init__(self, num_samples=200, train_split=0.7):
+        super().__init__()
+
+        closes = [10+np.arange(1, num_samples+1)*10, np.arange(1, num_samples), 10+np.arange(1, num_samples)*-10]
+        closes = np.array(closes)
+        closes = np.log(closes)
+
+        data = self.featurize(closes,
+                              conf={'returns': True})
+        split_level = int(num_samples * train_split)
+        self.train_data, self.test_data, self.train_close, self.test_close = \
+            Container.split(closes=closes, data=data, split_level=split_level)
 
 class BitcoinTestContainer(Container):
     def __init__(self, csv_file_name=None, train_split=0.7):

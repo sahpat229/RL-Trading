@@ -15,13 +15,13 @@ class State():
         self.terminated = terminated
         self.price = price
 
-    @property
-    def returns(self):
-        """
-        Gets all the returns [X_t-history_length+1 ... X_t].  Assumes that returns is the first feature
-            in asset_features
-        """
-        return self.asset_features[:, :, 0] # [num_assets, num_history_length]
+    # @property
+    # def returns(self):
+    #     """
+    #     Gets all the returns [X_t-history_length+1 ... X_t].  Assumes that returns is the first feature
+    #         in asset_features
+    #     """
+    #     return self.asset_features[:, :, 0] # [num_assets, num_history_length]
     
     @property
     def features(self):
@@ -69,8 +69,8 @@ class TradingStateModel():
 
         reward, after_price_changes, info = self.reward(old_portfolio=self.state.portfolio_allocation,
                                                         new_portfolio=action,
-                                                        price_returns=self.datacontainer.get_asset_features(train=self.is_training,
-                                                                                                            time=self.time)[:, 0],
+                                                        price_returns=self.datacontainer.get_price_returns(train=self.is_training,
+                                                                                                           time=self.time),
                                                         commission_percentage=self.commission_percentage)
         new_state = State(asset_features=self.datacontainer.get_asset_features(train=self.is_training,
                                                                                time=self.time,
@@ -93,6 +93,7 @@ class TradingStateModel():
 
         pnl = np.dot(new_portfolio, price_returns)
         tc = commission_rate * np.sum(np.abs(new_portfolio - old_portfolio))
+        #print("Reward:", 1 + pnl - tc)
         reward = np.log(1 + pnl - tc)
 
         after_price_changes = new_portfolio * (1 + price_returns) / (1 + pnl - tc) # {a_(t+1)^tilda}_i [num_assets]

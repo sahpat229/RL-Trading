@@ -10,6 +10,7 @@ from baselines.common.mpi_adam import MpiAdam
 import baselines.common.tf_util as U
 from baselines.common.mpi_running_mean_std import RunningMeanStd
 from mpi4py import MPI
+from utils import convert_features
 
 def normalize(x, stats):
     if stats is None:
@@ -34,6 +35,9 @@ def get_target_updates(vars, target_vars, tau):
     logger.info('setting up target updates ...')
     soft_updates = []
     init_updates = []
+    print("VARS:", vars)
+    print("VARS:", target_vars)
+    print("VARS:", len(vars), "TARGET:", len(target_vars))
     assert len(vars) == len(target_vars)
     for var, target_var in zip(vars, target_vars):
         logger.info('  {} <- {}'.format(target_var.name, var.name))
@@ -126,8 +130,10 @@ class DDPG(object):
         # Create networks and core TF parts that are shared across setup parts.
         self.actor_tf = actor(normalized_obs0)
         self.normalized_critic_tf = critic(normalized_obs0, self.actions)
+        print("LEN CRITIC VARS 0:", len(critic.vars))
         self.critic_tf = denormalize(tf.clip_by_value(self.normalized_critic_tf, self.return_range[0], self.return_range[1]), self.ret_rms)
         self.normalized_critic_with_actor_tf = critic(normalized_obs0, self.actor_tf, reuse=True)
+        print("LEN CRITIC VARS 1:", len(critic.vars))
         self.critic_with_actor_tf = denormalize(tf.clip_by_value(self.normalized_critic_with_actor_tf, self.return_range[0], self.return_range[1]), self.ret_rms)
         Q_obs1 = denormalize(target_critic(normalized_obs1, target_actor(normalized_obs1)), self.ret_rms)
         self.target_Q = self.rewards + (1. - self.terminals1) * gamma * Q_obs1
@@ -280,7 +286,6 @@ class DDPG(object):
     def train(self):
         # Get a batch.
         batch = self.memory.sample(batch_size=self.batch_size)
-
         if self.normalize_returns and self.enable_popart:
             old_mean, old_std, target_Q = self.sess.run([self.ret_rms.mean, self.ret_rms.std, self.target_Q], feed_dict={
                 self.obs1: batch['obs1'],
