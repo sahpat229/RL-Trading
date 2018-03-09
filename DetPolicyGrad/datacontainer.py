@@ -163,9 +163,9 @@ class EasyContainer(Container):
     def __init__(self, num_samples=200, train_split=0.7):
         super().__init__()
 
-        closes = [10+np.arange(1, num_samples+1)*10, np.arange(1, num_samples), 10+np.arange(1, num_samples)*-10]
+        closes = [10+np.arange(1, num_samples+1)*10, np.linspace(10000, 0, num_samples)+0.01, np.linspace(1000, 0, num_samples)+0.01]
         closes = np.array(closes)
-        closes = np.log(closes)
+        print("Closes:", closes)        
 
         data = self.featurize(closes,
                               conf={'returns': True})

@@ -4,7 +4,7 @@ import gym
 import numpy as np
 import tensorflow as tf
 
-from datacontainer import BitcoinTestContainer, TestContainer, DataContainer
+from datacontainer import BitcoinTestContainer, TestContainer, DataContainer, EasyContainer
 from dpg_gym_tf import DDPG, OrnsteinUhlenbeckActionNoise
 from networks_tf import ActorNetwork, CriticNetwork
 from replaybuffer import ReplayBuffer
@@ -29,8 +29,9 @@ COMMISSION_PERCENTAGE = 0.0
 # action_dim = env.action_space.shape[0]
 # boundary = env.action_space.high[0]
 
-dc = TestContainer(num_assets=3,
-                   num_samples=2000)
+# dc = TestContainer(num_assets=3,
+#                    num_samples=2000)
+dc = EasyContainer(num_samples=2000)
 #dc = DataContainer(hdf_file_name='../data/hdfs/poloniex_30m.hf')
 #dc = BitcoinTestContainer(csv_file_name='../data/csvs/output.csv')
 env = TradingStateModel(datacontainer=dc,

@@ -121,6 +121,7 @@ class DDPG():
                                             portfolio_inputs=np.array([state.portfolio_allocation]))[0]
                 #print("ACTION before:", softmax(action))
                 noise = self.actor_noise()
+                noise = 0
                 #print("NOISE:", noise)
                 action += noise
                 action = softmax(action) # take softmax here
